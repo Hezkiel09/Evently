@@ -1,4 +1,4 @@
-package com.example.evently.ui.theme
+package com.example.evently.core.ui
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
