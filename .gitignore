@@ -15,26 +15,3 @@
 local.properties
 
 # --- TAMBAHAN: Paksa Git melacak folder kosong arsitektur fitur & core ---
-/app/src/main/java/com/example/evently/core/data/*
-!/app/src/main/java/com/example/evently/core/data/
-
-/app/src/main/java/com/example/evently/core/model/*
-!/app/src/main/java/com/example/evently/core/model/
-
-/app/src/main/java/com/example/evently/features/home/*
-!/app/src/main/java/com/example/evently/features/home/
-
-/app/src/main/java/com/example/evently/features/announcement/*
-!/app/src/main/java/com/example/evently/features/announcement/
-
-/app/src/main/java/com/example/evently/features/attendance/*
-!/app/src/main/java/com/example/evently/features/attendance/
-
-/app/src/main/java/com/example/evently/features/eventmanagement/*
-!/app/src/main/java/com/example/evently/features/eventmanagement/
-
-/app/src/main/java/com/example/evently/features/rsvp/*
-!/app/src/main/java/com/example/evently/features/rsvp/
-
-/app/src/main/java/com/example/evently/features/schedule/*
-!/app/src/main/java/com/example/evently/features/schedule/
