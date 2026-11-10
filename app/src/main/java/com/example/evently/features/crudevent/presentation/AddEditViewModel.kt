@@ -1,7 +1,10 @@
 package com.example.evently.features.crudevent.presentation
 
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import com.example.evently.features.crudevent.data.Event
 import androidx.lifecycle.ViewModel
+import com.example.evently.features.crudevent.data.EventRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +17,8 @@ data class AddEditEventUiState(
 )
 
 class AddEditViewModel : ViewModel() {
+
+    private val repository = EventRepository.instance
 
     private val _uiState = MutableStateFlow(
         AddEditEventUiState()
@@ -81,8 +86,12 @@ class AddEditViewModel : ViewModel() {
     fun saveEvent() {
         val event = _uiState.value.event
 
-        // Untuk sekarang dummy.
-        // Nanti di sini panggil repository/database.
-        println("Saving event: $event")
+        println("DEBUG SAVE: $event")
+
+        viewModelScope.launch {
+            println("DEBUG REPOSITORY: adding event")
+            repository.addEvent(event)
+            println("DEBUG REPOSITORY: event added")
+        }
     }
 }

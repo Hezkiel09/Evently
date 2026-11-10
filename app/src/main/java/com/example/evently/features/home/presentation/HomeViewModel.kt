@@ -1,10 +1,13 @@
 package com.example.evently.features.home.presentation
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.evently.features.crudevent.data.EventRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class EventUiModel(
     val id: Int,
@@ -30,26 +33,55 @@ data class HomeUiState(
 
 class HomeViewModel : ViewModel() {
 
+    private val repository = EventRepository.instance
+
     private val _uiState = MutableStateFlow(
-        HomeUiState(
-            events = dummyEvents
-        )
+        HomeUiState()
     )
 
     val uiState: StateFlow<HomeUiState> =
         _uiState.asStateFlow()
 
+    init {
+        observeEvents()
+    }
+
+    private fun observeEvents() {
+        viewModelScope.launch {
+            repository.events.collect { events ->
+
+                val eventUiModels = events.map { event ->
+                    EventUiModel(
+                        id = event.id ?: 0,
+                        title = event.name,
+                        category = event.category,
+                        date = event.date,
+                        time = event.time,
+                        location = event.location,
+                        organizer = "Evently"
+                    )
+                }
+
+                _uiState.update {
+                    it.copy(
+                        events = eventUiModels
+                    )
+                }
+            }
+        }
+    }
+
     fun updateSearchQuery(query: String) {
-        _uiState.update { currentState ->
-            currentState.copy(
+        _uiState.update {
+            it.copy(
                 searchQuery = query
             )
         }
     }
 
     fun selectCategory(category: String) {
-        _uiState.update { currentState ->
-            currentState.copy(
+        _uiState.update {
+            it.copy(
                 selectedCategory = category
             )
         }
@@ -59,7 +91,6 @@ class HomeViewModel : ViewModel() {
         val state = _uiState.value
 
         return state.events.filter { event ->
-
             val matchesSearch =
                 event.title.contains(
                     state.searchQuery,
@@ -72,31 +103,5 @@ class HomeViewModel : ViewModel() {
 
             matchesSearch && matchesCategory
         }
-    }
-
-    companion object {
-
-        private val dummyEvents = listOf(
-
-            EventUiModel(
-                id = 1,
-                title = "Sunset Music Session",
-                category = "Music",
-                date = "21 Nov",
-                time = "18.30 WIB",
-                location = "Taman Menteng, Jakarta",
-                organizer = "Evently"
-            ),
-
-            EventUiModel(
-                id = 2,
-                title = "Creative Meetup Jakarta",
-                category = "Education",
-                date = "28 Nov",
-                time = "10.00 WIB",
-                location = "M Bloc Space, Jakarta",
-                organizer = "Evently"
-            )
-        )
     }
 }
