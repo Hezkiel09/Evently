@@ -1,14 +1,14 @@
 package com.example.evently.features.crudevent.presentation
 
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.launch
-import com.example.evently.features.crudevent.data.Event
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.evently.features.crudevent.data.Event
 import com.example.evently.features.crudevent.data.EventRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class AddEditEventUiState(
     val event: Event = Event(),
@@ -18,11 +18,13 @@ data class AddEditEventUiState(
 
 class AddEditViewModel : ViewModel() {
 
-    private val repository = EventRepository.instance
+    private val repository =
+        EventRepository.instance
 
-    private val _uiState = MutableStateFlow(
-        AddEditEventUiState()
-    )
+    private val _uiState =
+        MutableStateFlow(
+            AddEditEventUiState()
+        )
 
     val uiState: StateFlow<AddEditEventUiState> =
         _uiState.asStateFlow()
@@ -30,7 +32,9 @@ class AddEditViewModel : ViewModel() {
     fun updateName(name: String) {
         _uiState.update {
             it.copy(
-                event = it.event.copy(name = name)
+                event = it.event.copy(
+                    name = name
+                )
             )
         }
     }
@@ -38,7 +42,9 @@ class AddEditViewModel : ViewModel() {
     fun updateCategory(category: String) {
         _uiState.update {
             it.copy(
-                event = it.event.copy(category = category)
+                event = it.event.copy(
+                    category = category
+                )
             )
         }
     }
@@ -46,7 +52,9 @@ class AddEditViewModel : ViewModel() {
     fun updateDate(date: String) {
         _uiState.update {
             it.copy(
-                event = it.event.copy(date = date)
+                event = it.event.copy(
+                    date = date
+                )
             )
         }
     }
@@ -54,7 +62,9 @@ class AddEditViewModel : ViewModel() {
     fun updateTime(time: String) {
         _uiState.update {
             it.copy(
-                event = it.event.copy(time = time)
+                event = it.event.copy(
+                    time = time
+                )
             )
         }
     }
@@ -62,7 +72,9 @@ class AddEditViewModel : ViewModel() {
     fun updateLocation(location: String) {
         _uiState.update {
             it.copy(
-                event = it.event.copy(location = location)
+                event = it.event.copy(
+                    location = location
+                )
             )
         }
     }
@@ -70,7 +82,9 @@ class AddEditViewModel : ViewModel() {
     fun updateDescription(description: String) {
         _uiState.update {
             it.copy(
-                event = it.event.copy(description = description)
+                event = it.event.copy(
+                    description = description
+                )
             )
         }
     }
@@ -78,20 +92,34 @@ class AddEditViewModel : ViewModel() {
     fun updatePoster(poster: String) {
         _uiState.update {
             it.copy(
-                event = it.event.copy(poster = poster)
+                event = it.event.copy(
+                    poster = poster
+                )
             )
         }
     }
 
     fun saveEvent() {
+
         val event = _uiState.value.event
 
         println("DEBUG SAVE: $event")
 
         viewModelScope.launch {
-            println("DEBUG REPOSITORY: adding event")
+
+            _uiState.update {
+                it.copy(
+                    isLoading = true
+                )
+            }
+
             repository.addEvent(event)
-            println("DEBUG REPOSITORY: event added")
+
+            _uiState.update {
+                it.copy(
+                    isLoading = false
+                )
+            }
         }
     }
 }

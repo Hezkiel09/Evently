@@ -6,9 +6,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class EventRepository {
+class EventRepository private constructor() {
 
-    private val _events = MutableStateFlow<List<Event>>(
+    private val _events = MutableStateFlow(
         listOf(
             Event(
                 id = 1,
@@ -31,18 +31,43 @@ class EventRepository {
         )
     )
 
-    val events: StateFlow<List<Event>> =
-        _events.asStateFlow()
-
+    val events: StateFlow<List<Event>> = _events.asStateFlow()
     suspend fun addEvent(event: Event) {
         delay(300)
 
         _events.update { currentEvents ->
-            currentEvents + event.copy(
-                id = (currentEvents.maxOfOrNull { it.id ?: 0 } ?: 0) + 1
-            )
+
+            val newId =
+                (currentEvents.maxOfOrNull { it.id ?: 0 } ?: 0) + 1
+
+            listOf(event.copy(id = newId)) + currentEvents
+        }
+
+        println("DEBUG REPOSITORY: event added")
+    }
+
+    suspend fun updateEvent(event: Event) {
+        delay(300)
+
+        _events.update { currentEvents ->
+            currentEvents.map { currentEvent ->
+                if (currentEvent.id == event.id) {
+                    event
+                } else {
+                    currentEvent
+                }
+            }
         }
     }
+
+    suspend fun deleteEvent(eventId: Int) {
+        delay(300)
+
+        _events.update { currentEvents ->
+            currentEvents.filter { it.id != eventId }
+        }
+    }
+
     companion object {
         val instance = EventRepository()
     }

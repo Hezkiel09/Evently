@@ -26,18 +26,22 @@ data class HomeUiState(
         "Semua",
         "Music",
         "Education",
-        "Film"
+        "Film",
+        "Workshop",
+        "Seminar"
     ),
     val events: List<EventUiModel> = emptyList()
 )
 
 class HomeViewModel : ViewModel() {
 
-    private val repository = EventRepository.instance
+    private val repository =
+        EventRepository.instance
 
-    private val _uiState = MutableStateFlow(
-        HomeUiState()
-    )
+    private val _uiState =
+        MutableStateFlow(
+            HomeUiState()
+        )
 
     val uiState: StateFlow<HomeUiState> =
         _uiState.asStateFlow()
@@ -47,20 +51,24 @@ class HomeViewModel : ViewModel() {
     }
 
     private fun observeEvents() {
+
         viewModelScope.launch {
+
             repository.events.collect { events ->
 
-                val eventUiModels = events.map { event ->
-                    EventUiModel(
-                        id = event.id ?: 0,
-                        title = event.name,
-                        category = event.category,
-                        date = event.date,
-                        time = event.time,
-                        location = event.location,
-                        organizer = "Evently"
-                    )
-                }
+                val eventUiModels =
+                    events.map { event ->
+
+                        EventUiModel(
+                            id = event.id ?: 0,
+                            title = event.name,
+                            category = event.category,
+                            date = event.date,
+                            time = event.time,
+                            location = event.location,
+                            organizer = "Evently"
+                        )
+                    }
 
                 _uiState.update {
                     it.copy(
@@ -72,6 +80,7 @@ class HomeViewModel : ViewModel() {
     }
 
     fun updateSearchQuery(query: String) {
+
         _uiState.update {
             it.copy(
                 searchQuery = query
@@ -80,6 +89,7 @@ class HomeViewModel : ViewModel() {
     }
 
     fun selectCategory(category: String) {
+
         _uiState.update {
             it.copy(
                 selectedCategory = category
@@ -88,9 +98,11 @@ class HomeViewModel : ViewModel() {
     }
 
     fun getFilteredEvents(): List<EventUiModel> {
+
         val state = _uiState.value
 
         return state.events.filter { event ->
+
             val matchesSearch =
                 event.title.contains(
                     state.searchQuery,
