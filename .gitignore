@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# --- TAMBAHAN: Paksa Git melacak folder kosong arsitektur fitur & core ---
