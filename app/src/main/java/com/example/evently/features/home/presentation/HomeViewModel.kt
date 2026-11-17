@@ -2,6 +2,7 @@ package com.example.evently.features.home.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.evently.core.auth.AuthRepository
 import com.example.evently.features.crudevent.data.EventRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,7 +11,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class EventUiModel(
-    val id: Int,
+    val id: Long,
     val title: String,
     val category: String,
     val date: String,
@@ -30,13 +31,15 @@ data class HomeUiState(
         "Workshop",
         "Seminar"
     ),
-    val events: List<EventUiModel> = emptyList()
+    val events: List<EventUiModel> = emptyList(),
+    val userRole: String = "student"
 )
 
 class HomeViewModel : ViewModel() {
 
     private val repository =
         EventRepository.instance
+    private val authRepository = AuthRepository()
 
     private val _uiState =
         MutableStateFlow(
@@ -48,6 +51,16 @@ class HomeViewModel : ViewModel() {
 
     init {
         observeEvents()
+        loadUserRole()
+    }
+
+    private fun loadUserRole() {
+        viewModelScope.launch {
+            val profile = authRepository.getCurrentProfile()
+            _uiState.update {
+                it.copy(userRole = profile?.role ?: "student")
+            }
+        }
     }
 
     private fun observeEvents() {
@@ -60,7 +73,7 @@ class HomeViewModel : ViewModel() {
                     events.map { event ->
 
                         EventUiModel(
-                            id = event.id ?: 0,
+                            id = event.id ?: 0L,
                             title = event.name,
                             category = event.category,
                             date = event.date,
@@ -94,6 +107,12 @@ class HomeViewModel : ViewModel() {
             it.copy(
                 selectedCategory = category
             )
+        }
+    }
+
+    fun deleteEvent(eventId: Long) {
+        viewModelScope.launch {
+            repository.deleteEvent(eventId)
         }
     }
 

@@ -36,7 +36,8 @@ private val LightBg = Color(0xFFF8F9FA)
 fun AnnouncementFeedScreen(
     announcements: List<Announcement>,
     onAnnouncementClick: (Announcement) -> Unit,
-    onFabClick: () -> Unit
+    onFabClick: () -> Unit,
+    onNavItemClick: (EventlyNavItem) -> Unit = {}
 ) {
     Scaffold(
         containerColor = LightBg,
@@ -93,7 +94,10 @@ fun AnnouncementFeedScreen(
             }
         },
         bottomBar = {
-            EventlyNavigationBar(selectedItem = EventlyNavItem.ANNOUNCEMENT)
+            EventlyNavigationBar(
+                selectedItem = EventlyNavItem.ANNOUNCEMENT,
+                onItemSelected = onNavItemClick
+            )
         }
     ) { paddingValues ->
         LazyColumn(

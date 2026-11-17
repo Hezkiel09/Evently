@@ -7,7 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,7 +22,10 @@ private val EventlyOrange = Color(0xFFF59E0B)
 
 @Composable
 fun EventCard(
-    event: EventUiModel
+    event: EventUiModel,
+    userRole: String = "student",
+    onEditClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -131,10 +134,40 @@ fun EventCard(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    Icon(
-                        imageVector = Icons.Default.MoreHoriz,
-                        contentDescription = "More"
-                    )
+                    if (userRole != "student") {
+                        Box {
+                            var showMenu by remember { mutableStateOf(false) }
+
+                            IconButton(
+                                onClick = { showMenu = true }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreHoriz,
+                                    contentDescription = "More"
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Edit") },
+                                    onClick = {
+                                        showMenu = false
+                                        onEditClick()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete") },
+                                    onClick = {
+                                        showMenu = false
+                                        onDeleteClick()
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

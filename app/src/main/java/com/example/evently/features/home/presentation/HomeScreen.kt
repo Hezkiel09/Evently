@@ -7,29 +7,54 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.evently.core.ui.components.EventlyNavigationBar
+import com.example.evently.core.ui.components.EventlyNavItem
 import com.example.evently.features.home.components.CategoryChip
 import com.example.evently.features.home.components.LocationHeader
 import com.example.evently.features.home.components.SearchBar
 import com.example.evently.features.home.components.UpComingEventSection
-import com.example.evently.navigation.BottomNavBar
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
-    onAddEventClick: () -> Unit = {}
+    onAddEventClick: () -> Unit = {},
+    onEditEventClick: (EventUiModel) -> Unit = {},
+    onLogoutClick: () -> Unit = {},
+    onNavItemClick: (EventlyNavItem) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var eventToDelete by remember { mutableStateOf<EventUiModel?>(null) }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Evently") },
+                actions = {
+                    IconButton(onClick = onLogoutClick) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "Logout",
+                            tint = Color(0xFF3B1C5A)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            )
+        },
         bottomBar = {
-            BottomNavBar()
+            EventlyNavigationBar(
+                selectedItem = EventlyNavItem.HOME,
+                onItemSelected = onNavItemClick
+            )
         }
     ) { innerPadding ->
 
@@ -68,7 +93,37 @@ fun HomeScreen(
 
             UpComingEventSection(
                 events = viewModel.getFilteredEvents(),
-                onAddEventClick = onAddEventClick
+                userRole = uiState.userRole,
+                onAddEventClick = onAddEventClick,
+                onEditEventClick = onEditEventClick,
+                onDeleteEventClick = { event ->
+                    eventToDelete = event
+                }
+            )
+        }
+
+        eventToDelete?.let { event ->
+            AlertDialog(
+                onDismissRequest = { eventToDelete = null },
+                title = { Text("Hapus Event") },
+                text = { Text("Apakah Anda yakin ingin menghapus event \"${event.title}\"?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteEvent(event.id)
+                            eventToDelete = null
+                        }
+                    ) {
+                        Text("Hapus", color = Color.Red)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { eventToDelete = null }
+                    ) {
+                        Text("Batal")
+                    }
+                }
             )
         }
     }

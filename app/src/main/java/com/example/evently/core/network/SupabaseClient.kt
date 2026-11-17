@@ -1,6 +1,7 @@
 package com.example.evently.core.network
 
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.serializer.KotlinXSerializer
 import kotlinx.serialization.json.Json
@@ -11,6 +12,7 @@ object SupabaseNetwork {
         supabaseKey = "sb_publishable_AHaipZtzap1fC0gXDmMMNQ_jFDjSIyN"
     ) {
         install(Postgrest)
+        install(Auth)
 
         defaultSerializer = KotlinXSerializer(Json {
             ignoreUnknownKeys = true

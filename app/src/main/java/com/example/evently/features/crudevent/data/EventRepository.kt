@@ -1,70 +1,136 @@
 package com.example.evently.features.crudevent.data
 
-import kotlinx.coroutines.delay
+import com.example.evently.core.network.SupabaseNetwork
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class EventRepository private constructor() {
+    private val client = SupabaseNetwork.client.from("events")
 
-    private val _events = MutableStateFlow(
-        listOf(
-            Event(
-                id = 1,
-                name = "Sunset Music Session",
-                category = "Music",
-                date = "21 Nov",
-                time = "18.30 WIB",
-                location = "Taman Menteng, Jakarta",
-                description = "Music session bersama Evently"
-            ),
-            Event(
-                id = 2,
-                name = "Creative Meetup Jakarta",
-                category = "Education",
-                date = "28 Nov",
-                time = "10.00 WIB",
-                location = "M Bloc Space, Jakarta",
-                description = "Creative meetup untuk komunitas"
-            )
-        )
-    )
-
+    private val _events = MutableStateFlow<List<Event>>(emptyList())
     val events: StateFlow<List<Event>> = _events.asStateFlow()
-    suspend fun addEvent(event: Event) {
-        delay(300)
 
-        _events.update { currentEvents ->
+    init {
+        fetchEvents()
+    }
 
-            val newId =
-                (currentEvents.maxOfOrNull { it.id ?: 0 } ?: 0) + 1
+    suspend fun getEvents(): List<Event> {
+        return try {
+            val rawList = client.select {
+                order("id", Order.DESCENDING)
+            }.decodeList<Event>()
 
-            listOf(event.copy(id = newId)) + currentEvents
+            rawList.map { event ->
+                val parts = event.eventDate.split("T")
+                val parsedDate = parts.getOrNull(0) ?: "21 Nov"
+                val parsedTime = parts.getOrNull(1)?.substringBefore("Z")?.take(5) ?: "18.30 WIB"
+                event.copy(
+                    date = if (event.date.isBlank()) parsedDate else event.date,
+                    time = if (event.time.isBlank()) parsedTime else event.time
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
         }
+    }
 
-        println("DEBUG REPOSITORY: event added")
+    fun fetchEvents() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val result = getEvents()
+            _events.value = result
+            println("DEBUG REPOSITORY: fetched ${result.size} events from Supabase")
+        }
+    }
+
+    suspend fun addEvent(event: Event) {
+        try {
+            val dateTime = if (event.date.isNotBlank() && event.time.isNotBlank()) {
+                "${event.date}T${event.time}:00Z"
+            } else if (event.eventDate.isNotBlank()) {
+                event.eventDate
+            } else {
+                "2026-11-21T18:30:00Z"
+            }
+
+            val payload = buildJsonObject {
+                put("title", event.name)
+                put("description", event.description)
+                put("banner_url", event.poster ?: "")
+                put("location", event.location)
+                put("event_date", dateTime)
+                put("is_finished", event.isFinished)
+                if (event.organizerId != null) {
+                    put("organizer_id", event.organizerId)
+                }
+            }
+
+            client.insert(payload)
+            fetchEvents()
+            println("DEBUG REPOSITORY: event added to Supabase")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("DEBUG REPOSITORY ERROR adding event: ${e.message}")
+        }
     }
 
     suspend fun updateEvent(event: Event) {
-        delay(300)
-
-        _events.update { currentEvents ->
-            currentEvents.map { currentEvent ->
-                if (currentEvent.id == event.id) {
-                    event
+        try {
+            if (event.id != null) {
+                val dateTime = if (event.date.isNotBlank() && event.time.isNotBlank()) {
+                    "${event.date}T${event.time}:00Z"
+                } else if (event.eventDate.isNotBlank()) {
+                    event.eventDate
                 } else {
-                    currentEvent
+                    "2026-11-21T18:30:00Z"
                 }
+
+                val payload = buildJsonObject {
+                    put("title", event.name)
+                    put("description", event.description)
+                    put("banner_url", event.poster ?: "")
+                    put("location", event.location)
+                    put("event_date", dateTime)
+                    put("is_finished", event.isFinished)
+                    if (event.organizerId != null) {
+                        put("organizer_id", event.organizerId)
+                    }
+                }
+
+                client.update(payload) {
+                    filter {
+                        eq("id", event.id)
+                    }
+                }
+                fetchEvents()
+                println("DEBUG REPOSITORY: event updated in Supabase")
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("DEBUG REPOSITORY ERROR updating event: ${e.message}")
         }
     }
 
-    suspend fun deleteEvent(eventId: Int) {
-        delay(300)
-
-        _events.update { currentEvents ->
-            currentEvents.filter { it.id != eventId }
+    suspend fun deleteEvent(eventId: Long) {
+        try {
+            client.delete {
+                filter {
+                    eq("id", eventId)
+                }
+            }
+            fetchEvents()
+            println("DEBUG REPOSITORY: event deleted from Supabase")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("DEBUG REPOSITORY ERROR deleting event: ${e.message}")
         }
     }
 
