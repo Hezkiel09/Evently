@@ -2,13 +2,8 @@ package com.example.evently.features.crudevent.presentation
 
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,10 +22,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -50,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -97,7 +90,7 @@ fun AddEditEventScreen(
                             val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                             val formattedDate = formatter.format(Date(millis))
                             viewModel.updateDate(formattedDate)
-                            if (event.time.isBlank()) {
+                            if (event.eventDate.substringAfter('T', "").isBlank()) {
                                 viewModel.updateTime("18:30")
                             }
                         }
@@ -169,15 +162,15 @@ fun AddEditEventScreen(
             )
 
             Text(
-                text = "Poster Event *",
+                text = "URL Banner (opsional)",
                 fontSize = 11.sp
             )
 
-            PosterPicker(
-                poster = event.poster,
-                onPosterSelected = {
-                    viewModel.updatePoster(it)
-                }
+            EventTextField(
+                label = "URL Banner",
+                value = event.bannerUrl.orEmpty(),
+                placeholder = "https://...",
+                onValueChange = viewModel::updatePoster
             )
 
             EventTextField(
@@ -189,13 +182,6 @@ fun AddEditEventScreen(
                 }
             )
 
-            CategoryDropdown(
-                value = event.category,
-                onValueChange = {
-                    viewModel.updateCategory(it)
-                }
-            )
-
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -204,13 +190,15 @@ fun AddEditEventScreen(
                 EventTextField(
                     label = "Tanggal & Waktu *",
                     value = buildString {
-                        append(event.date)
+                        val date = event.eventDate.substringBefore('T')
+                        val time = event.eventDate.substringAfter('T', "").substringBefore(':', "") +
+                            ":" + event.eventDate.substringAfter('T', "").substringAfter(':', "").take(2)
+                        append(date)
 
-                        if (event.date.isNotEmpty() && event.time.isNotEmpty()) {
+                        if (date.isNotEmpty() && time.length > 1) {
                             append(", ")
                         }
-
-                        append(event.time)
+                        append(time.trim(':'))
                     },
                     placeholder = "Pilih tanggal dan waktu",
                     trailingIcon = {
@@ -227,6 +215,16 @@ fun AddEditEventScreen(
                     readOnly = true
                 )
             }
+
+            EventTextField(
+                label = "Waktu *",
+                value = event.eventDate.substringAfter('T', "").take(5),
+                placeholder = "18:30",
+                onValueChange = { value ->
+                    val normalized = value.filter { it.isDigit() || it == ':' }.take(5)
+                    if (normalized.length == 5) viewModel.updateTime(normalized)
+                }
+            )
 
             EventTextField(
                 label = "Lokasi *",
@@ -290,59 +288,6 @@ fun AddEditEventScreen(
         }
     }
 }
-
-@Composable
-private fun PosterPicker(
-    poster: String?,
-    onPosterSelected: (String) -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(90.dp)
-            .background(
-                color = Color(0xFFFFFCF5),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .border(
-                width = 1.dp,
-                color = Color(0xFFF2D9A0),
-                shape = RoundedCornerShape(10.dp)
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            Icon(
-                imageVector = Icons.Outlined.Image,
-                contentDescription = null,
-                tint = EventlyOrange
-            )
-
-            Spacer(
-                modifier = Modifier.height(4.dp)
-            )
-
-            Text(
-                text = if (poster == null) {
-                    "Pilih poster event"
-                } else {
-                    "Poster dipilih"
-                },
-                fontSize = 10.sp
-            )
-
-            Text(
-                text = "JPG, PNG atau WebP • Maks. 5 MB",
-                fontSize = 8.sp,
-                color = Color.Gray
-            )
-        }
-    }
-}
-
 @Composable
 private fun EventTextField(
     label: String,
@@ -380,82 +325,5 @@ private fun EventTextField(
             shape = RoundedCornerShape(8.dp),
             readOnly = readOnly
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CategoryDropdown(
-    value: String,
-    onValueChange: (String) -> Unit
-) {
-    var expanded by remember {
-        mutableStateOf(false)
-    }
-
-    val categories = listOf(
-        "Music",
-        "Education",
-        "Film",
-        "Workshop",
-        "Seminar"
-    )
-
-    Column {
-        Text(
-            text = "Kategori *",
-            fontSize = 10.sp
-        )
-
-        Spacer(
-            modifier = Modifier.height(4.dp)
-        )
-
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = {
-                expanded = !expanded
-            }
-        ) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = {},
-                readOnly = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(),
-                placeholder = {
-                    Text(
-                        text = "Pilih kategori",
-                        fontSize = 11.sp
-                    )
-                },
-                trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(
-                        expanded = expanded
-                    )
-                },
-                shape = RoundedCornerShape(8.dp)
-            )
-
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = {
-                    expanded = false
-                }
-            ) {
-                categories.forEach { category ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(category)
-                        },
-                        onClick = {
-                            onValueChange(category)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
     }
 }

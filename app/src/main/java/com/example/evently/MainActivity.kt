@@ -23,7 +23,6 @@ import com.example.evently.features.auth.presentation.ForgotPasswordScreen
 import com.example.evently.features.auth.presentation.LoginScreen
 import com.example.evently.features.auth.presentation.RegisterScreen
 import com.example.evently.features.auth.presentation.RoleSelectionScreen
-import com.example.evently.features.crudevent.data.EventRepository
 import com.example.evently.features.crudevent.presentation.AddEditEventScreen
 import com.example.evently.features.crudevent.presentation.AddEditViewModel
 import com.example.evently.features.home.presentation.HomeScreen
@@ -54,14 +53,23 @@ class MainActivity : ComponentActivity() {
             val homeViewModel: HomeViewModel = viewModel()
             val addEditViewModel: AddEditViewModel = viewModel()
 
-            val startDest = if (AuthRepository().isUserLoggedIn()) Screen.Home.route else Screen.Login.route
+            // Debug installs should open Login so Register/Login can be tested repeatedly.
+            // Release installs restore Home only when a Supabase session already exists.
+            val isDebugBuild = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+            val startDest = if (isDebugBuild) {
+                Screen.Login.route
+            } else if (AuthRepository().isUserLoggedIn()) {
+                Screen.Home.route
+            } else {
+                Screen.Login.route
+            }
 
             NavHost(
                 navController = navController,
                 startDestination = startDest
             ) {
                 // Auth Nav Graph
-                authNavGraph(navController, authViewModel)
+                authNavGraph(navController, authViewModel, homeViewModel)
 
                 // Modul 1 & CRUD Event (Yehezkiel)
                 catalogNavGraph(navController, homeViewModel, addEditViewModel, authViewModel)
@@ -81,12 +89,14 @@ class MainActivity : ComponentActivity() {
 // Extension Function untuk Navigasi Auth Flow
 fun NavGraphBuilder.authNavGraph(
     navController: NavHostController,
-    authViewModel: AuthViewModel
+    authViewModel: AuthViewModel,
+    homeViewModel: HomeViewModel
 ) {
     composable(Screen.Login.route) {
         LoginScreen(
             viewModel = authViewModel,
             onLoginSuccess = {
+                homeViewModel.loadUserRole()
                 navController.navigate(Screen.Home.route) {
                     popUpTo(Screen.Login.route) { inclusive = true }
                 }
@@ -116,8 +126,9 @@ fun NavGraphBuilder.authNavGraph(
         RoleSelectionScreen(
             viewModel = authViewModel,
             onRegistrationSuccess = {
-                navController.navigate(Screen.Home.route) {
-                    popUpTo(Screen.Login.route) { inclusive = true }
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(Screen.Login.route) { inclusive = false }
+                    launchSingleTop = true
                 }
             },
             onBackClick = {
@@ -144,14 +155,17 @@ fun NavGraphBuilder.catalogNavGraph(
     authViewModel: AuthViewModel
 ) {
     composable(Screen.Home.route) {
+        val authState by authViewModel.uiState.collectAsState()
         HomeScreen(
             viewModel = homeViewModel,
+            isLoggingOut = authState.isLoading,
+            authErrorMessage = authState.errorMessage,
             onAddEventClick = {
                 addEditViewModel.resetForm()
                 navController.navigate(Screen.AddEditEvent.route)
             },
             onEditEventClick = { eventUiModel ->
-                val fullEvent = EventRepository.instance.events.value.find { it.id == eventUiModel.id }
+                val fullEvent = homeViewModel.findEvent(eventUiModel.id)
                 if (fullEvent != null) {
                     addEditViewModel.loadEvent(fullEvent)
                 } else {
@@ -162,7 +176,7 @@ fun NavGraphBuilder.catalogNavGraph(
             onLogoutClick = {
                 authViewModel.signOut {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
+                        popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 }
             },
@@ -198,7 +212,10 @@ fun NavGraphBuilder.catalogNavGraph(
     composable(Screen.AddEditEvent.route) {
         AddEditEventScreen(
             viewModel = addEditViewModel,
-            onBackClick = { navController.popBackStack() }
+            onBackClick = {
+                homeViewModel.refreshEvents()
+                navController.popBackStack()
+            }
         )
     }
 }

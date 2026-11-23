@@ -17,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.evently.core.ui.components.EventlyNavigationBar
 import com.example.evently.core.ui.components.EventlyNavItem
-import com.example.evently.features.home.components.CategoryChip
 import com.example.evently.features.home.components.LocationHeader
 import com.example.evently.features.home.components.SearchBar
 import com.example.evently.features.home.components.UpComingEventSection
@@ -29,17 +28,25 @@ fun HomeScreen(
     onAddEventClick: () -> Unit = {},
     onEditEventClick: (EventUiModel) -> Unit = {},
     onLogoutClick: () -> Unit = {},
-    onNavItemClick: (EventlyNavItem) -> Unit = {}
+    onNavItemClick: (EventlyNavItem) -> Unit = {},
+    isLoggingOut: Boolean = false,
+    authErrorMessage: String? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var eventToDelete by remember { mutableStateOf<EventUiModel?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(authErrorMessage) {
+        authErrorMessage?.let { snackbarHostState.showSnackbar(it) }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Evently") },
                 actions = {
-                    IconButton(onClick = onLogoutClick) {
+                    IconButton(onClick = onLogoutClick, enabled = !isLoggingOut) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Logout,
                             contentDescription = "Logout",
@@ -70,6 +77,13 @@ fun HomeScreen(
 
             LocationHeader()
 
+            uiState.profileErrorMessage?.let { message ->
+                Text(message, color = Color.Red, style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { viewModel.loadUserRole() }) {
+                    Text("Coba muat profil lagi")
+                }
+            }
+
             Spacer(modifier = Modifier.height(20.dp))
 
             SearchBar(
@@ -81,25 +95,21 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            CategoryChip(
-                categories = uiState.categories,
-                selectedCategory = uiState.selectedCategory,
-                onCategorySelected = {
-                    viewModel.selectCategory(it)
-                }
-            )
-
             Spacer(modifier = Modifier.height(24.dp))
-
-            UpComingEventSection(
-                events = viewModel.getFilteredEvents(),
-                userRole = uiState.userRole,
-                onAddEventClick = onAddEventClick,
-                onEditEventClick = onEditEventClick,
-                onDeleteEventClick = { event ->
-                    eventToDelete = event
+            when {
+                uiState.isLoading -> CircularProgressIndicator()
+                uiState.errorMessage != null -> Column {
+                    Text("Gagal memuat event: ${uiState.errorMessage}", color = Color.Red)
+                    TextButton(onClick = viewModel::refreshEvents) { Text("Coba lagi") }
                 }
-            )
+                else -> UpComingEventSection(
+                    events = viewModel.getFilteredEvents(),
+                    userRole = uiState.userRole,
+                    onAddEventClick = onAddEventClick,
+                    onEditEventClick = onEditEventClick,
+                    onDeleteEventClick = { event -> eventToDelete = event }
+                )
+            }
         }
 
         eventToDelete?.let { event ->

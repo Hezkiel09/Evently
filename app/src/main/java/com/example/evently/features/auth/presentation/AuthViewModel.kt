@@ -35,18 +35,13 @@ class AuthViewModel : ViewModel() {
 
     fun checkSession() {
         viewModelScope.launch {
-            if (authRepository.isUserLoggedIn()) {
+            try {
                 val profile = authRepository.getCurrentProfile()
                 _uiState.update {
-                    it.copy(
-                        isAuthenticated = true,
-                        userProfile = profile
-                    )
+                    it.copy(isAuthenticated = profile != null, userProfile = profile)
                 }
-            } else {
-                _uiState.update {
-                    it.copy(isAuthenticated = false, userProfile = null)
-                }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isAuthenticated = false, userProfile = null) }
             }
         }
     }
@@ -57,8 +52,8 @@ class AuthViewModel : ViewModel() {
     fun updateFullName(name: String) { _uiState.update { it.copy(fullName = name, errorMessage = null) } }
     
     fun selectRole(role: String) {
-        if (role == "admin") return // Constraint 1: admin never selectable via UI
-        _uiState.update { it.copy(selectedRole = role) }
+        if (role !in setOf("student", "organizer")) return
+        _uiState.update { it.copy(selectedRole = role, errorMessage = null) }
     }
 
     fun clearMessages() {
@@ -87,11 +82,10 @@ class AuthViewModel : ViewModel() {
                 }
                 onSuccess(profile.role)
             } catch (e: Exception) {
-                e.printStackTrace()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = "Gagal login: ${e.localizedMessage ?: "Periksa kembali email dan password."}"
+                        errorMessage = loginError(e)
                     )
                 }
             }
@@ -127,16 +121,17 @@ class AuthViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        successMessage = "Registrasi berhasil! Silakan login."
+                        password = "",
+                        confirmPassword = "",
+                        successMessage = "Registrasi berhasil. Jika diminta konfirmasi email, cek inbox lalu login."
                     )
                 }
                 onSuccessToLogin()
             } catch (e: Exception) {
-                e.printStackTrace()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = "Gagal mendaftar: ${e.localizedMessage ?: "Terjadi kesalahan."}"
+                        errorMessage = signUpError(e)
                     )
                 }
             }
@@ -144,13 +139,20 @@ class AuthViewModel : ViewModel() {
     }
 
     fun signOut(onSignOut: () -> Unit) {
+        if (_uiState.value.isLoading) return
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 authRepository.signOut()
                 _uiState.value = AuthUiState()
                 onSignOut()
             } catch (e: Exception) {
-                e.printStackTrace()
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Gagal logout. Periksa koneksi internet lalu coba lagi."
+                    )
+                }
             }
         }
     }
@@ -167,9 +169,30 @@ class AuthViewModel : ViewModel() {
                 _uiState.update { it.copy(isLoading = false, successMessage = "Link pemulihan password telah dikirim ke email Anda.") }
                 onSuccess()
             } catch (e: Exception) {
-                e.printStackTrace()
-                _uiState.update { it.copy(isLoading = false, errorMessage = "Gagal mengirim link: ${e.localizedMessage}") }
+                _uiState.update { it.copy(isLoading = false, errorMessage = "Gagal mengirim link pemulihan. Periksa email dan koneksi internet.") }
             }
+        }
+    }
+
+    private fun signUpError(error: Exception): String {
+        val detail = error.message.orEmpty().lowercase()
+        return when {
+            "already registered" in detail || "already exists" in detail || "user exists" in detail ->
+                "Email sudah terdaftar. Silakan login."
+            "password" in detail && ("weak" in detail || "short" in detail) ->
+                "Password belum memenuhi ketentuan. Gunakan minimal 6 karakter."
+            else -> "Gagal mendaftar. Periksa kembali data dan koneksi internet."
+        }
+    }
+
+    private fun loginError(error: Exception): String {
+        val detail = error.message.orEmpty().lowercase()
+        return when {
+            "email not confirmed" in detail || "email is not confirmed" in detail ->
+                "Konfirmasi email Anda terlebih dahulu, lalu silakan login."
+            "profil akun tidak ditemukan" in detail || "role akun tidak valid" in detail ->
+                error.message ?: "Profil akun tidak valid. Hubungi administrator."
+            else -> "Login gagal. Periksa email dan password Anda."
         }
     }
 }

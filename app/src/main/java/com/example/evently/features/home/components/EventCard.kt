@@ -46,13 +46,7 @@ fun EventCard(
                     .height(130.dp)
                     .padding(6.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        when (event.category) {
-                            "Music" -> Color(0xFF173B38)
-                            "Education" -> Color(0xFFD9D9BC)
-                            else -> Color.LightGray
-                        }
-                    )
+                    .background(Color(0xFF173B38))
             ) {
                 Column(
                     modifier = Modifier
@@ -69,19 +63,11 @@ fun EventCard(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = when (event.category) {
-                            "Music" -> "SUNSET\nSESSIONS."
-                            "Education" -> "Creative\nMeetup."
-                            else -> event.title
-                        },
+                        text = event.title,
                         fontSize = 24.sp,
                         lineHeight = 28.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (event.category == "Education") {
-                            Color(0xFF29473F)
-                        } else {
-                            Color.White
-                        }
+                        color = Color.White
                     )
 
                     Spacer(modifier = Modifier.weight(1f))
@@ -89,11 +75,7 @@ fun EventCard(
                     Text(
                         text = "${event.date.uppercase()} / JAKARTA",
                         fontSize = 7.sp,
-                        color = if (event.category == "Education") {
-                            Color(0xFF29473F)
-                        } else {
-                            Color.White
-                        }
+                        color = Color.White
                     )
                 }
             }
@@ -114,7 +96,7 @@ fun EventCard(
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = event.category,
+                            text = "Event",
                             modifier = Modifier.padding(
                                 horizontal = 10.dp,
                                 vertical = 5.dp
@@ -134,7 +116,7 @@ fun EventCard(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    if (userRole != "student") {
+                    if (event.canManage && userRole == "organizer") {
                         Box {
                             var showMenu by remember { mutableStateOf(false) }
 

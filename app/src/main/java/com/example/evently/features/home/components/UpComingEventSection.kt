@@ -51,7 +51,7 @@ fun UpComingEventSection(
                 modifier = Modifier.weight(1f)
             )
 
-            if (userRole != "student") {
+            if (userRole == "organizer") {
                 Button(
                     onClick = onAddEventClick,
                     colors = ButtonDefaults.buttonColors(
@@ -85,6 +85,9 @@ fun UpComingEventSection(
         )
 
         // EVENT LIST
+        if (events.isEmpty()) {
+            Text("Belum ada event.", color = Color.Gray, fontSize = 13.sp)
+        }
         events.forEach { event ->
 
             EventCard(

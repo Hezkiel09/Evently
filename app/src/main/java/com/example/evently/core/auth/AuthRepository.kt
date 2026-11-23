@@ -6,56 +6,34 @@ import io.github.jan.supabase.gotrue.providers.builtin.Email
 import io.github.jan.supabase.postgrest.from
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import io.github.jan.supabase.gotrue.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 @Serializable
 data class UserProfile(
     @SerialName("id") val id: String,
-    @SerialName("email") val email: String?,
-    @SerialName("full_name") val fullName: String?,
-    @SerialName("role") val role: String = "student"
+    @SerialName("email") val email: String? = null,
+    @SerialName("full_name") val fullName: String? = null,
+    @SerialName("role") val role: String,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("created_at") val createdAt: String? = null
 )
 
 class AuthRepository {
     private val client = SupabaseNetwork.client
     private val profilesClient = client.from("profiles")
 
-    suspend fun signUp(
-        email: String,
-        pass: String,
-        fullName: String,
-        role: String
-    ): UserProfile {
-
-        val user = client.auth.signUpWith(Email) {
+    /** The existing auth.users trigger provisions the profile from this metadata. */
+    suspend fun signUp(email: String, pass: String, fullName: String, role: String) {
+        val databaseRole = role.toDatabaseRole()
+        client.auth.signUpWith(Email) {
             this.email = email
             this.password = pass
-
             data = buildJsonObject {
                 put("full_name", fullName)
-                put("role", role)
+                put("role", databaseRole)
             }
         }
-
-        val userId = user?.id
-            ?: throw IllegalStateException("Registrasi gagal: User ID tidak ditemukan.")
-
-        val profile = UserProfile(
-            id = userId,
-            email = email,
-            fullName = fullName,
-            role = role
-        )
-
-        try {
-            profilesClient.insert(profile)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        return profile
     }
 
     suspend fun signIn(email: String, pass: String): UserProfile {
@@ -63,7 +41,8 @@ class AuthRepository {
             this.email = email
             this.password = pass
         }
-        return getCurrentProfile() ?: throw IllegalStateException("Profil pengguna tidak ditemukan.")
+        return getCurrentProfile()
+            ?: throw IllegalStateException("Profil akun tidak ditemukan. Hubungi administrator.")
     }
 
     suspend fun signOut() {
@@ -72,22 +51,15 @@ class AuthRepository {
 
     suspend fun getCurrentProfile(): UserProfile? {
         val user = client.auth.currentUserOrNull() ?: return null
-        try {
-            val profiles = profilesClient.select {
-                filter {
-                    eq("id", user.id)
-                }
-            }.decodeList<UserProfile>()
-            return profiles.firstOrNull() ?: UserProfile(
-                id = user.id,
-                email = user.email,
-                fullName = user.userMetadata?.get("full_name")?.toString(),
-                role = "student"
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return UserProfile(id = user.id, email = user.email, fullName = null, role = "student")
-        }
+        val profile = profilesClient.select {
+            filter { eq("id", user.id) }
+        }.decodeList<UserProfile>().firstOrNull()
+            ?: throw IllegalStateException("Profil akun tidak ditemukan. Hubungi administrator.")
+        return profile.copy(
+            email = profile.email ?: user.email,
+            fullName = profile.fullName ?: user.userMetadata?.get("full_name")?.toString(),
+            role = profile.role.toDomainRole()
+        )
     }
 
     suspend fun resetPassword(email: String) {
@@ -95,12 +67,22 @@ class AuthRepository {
     }
 
     suspend fun updatePassword(newPassword: String) {
-        client.auth.modifyUser {
-            password = newPassword
-        }
+        client.auth.modifyUser { password = newPassword }
     }
 
-    fun isUserLoggedIn(): Boolean {
-        return client.auth.currentUserOrNull() != null
+    fun isUserLoggedIn(): Boolean = client.auth.currentUserOrNull() != null
+
+    private fun String.toDatabaseRole(): String = when (lowercase()) {
+        "student", "mahasiswa" -> "mahasiswa"
+        "organizer", "panitia" -> "panitia"
+        "admin" -> "admin"
+        else -> throw IllegalArgumentException("Pilihan role tidak valid.")
+    }
+
+    private fun String.toDomainRole(): String = when (lowercase()) {
+        "mahasiswa", "student" -> "student"
+        "panitia", "organizer" -> "organizer"
+        "admin" -> "admin"
+        else -> throw IllegalStateException("Role akun tidak valid. Hubungi administrator.")
     }
 }
