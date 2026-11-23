@@ -12,13 +12,31 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.evently.core.auth.AuthRepository
+import com.example.evently.core.ui.components.EventlyNavItem
 import com.example.evently.features.announcement.presentation.AnnouncementViewModel
 import com.example.evently.features.announcement.presentation.screens.AnnouncementDetailScreen
 import com.example.evently.features.announcement.presentation.screens.AnnouncementFeedScreen
 import com.example.evently.features.announcement.presentation.screens.AnnouncementFormScreen
+import com.example.evently.features.auth.presentation.AuthViewModel
+import com.example.evently.features.auth.presentation.ForgotPasswordScreen
+import com.example.evently.features.auth.presentation.LoginScreen
+import com.example.evently.features.auth.presentation.RegisterScreen
+import com.example.evently.features.auth.presentation.RoleSelectionScreen
+import com.example.evently.features.crudevent.presentation.AddEditEventScreen
+import com.example.evently.features.crudevent.presentation.AddEditViewModel
+import com.example.evently.features.home.presentation.HomeScreen
+import com.example.evently.features.home.presentation.HomeViewModel
+import com.example.evently.features.ticket.presentation.TicketFeatureRoute
 
-// Definisi Route Navigasi Resmi Proyek
 sealed class Screen(val route: String) {
+    object Login : Screen("login")
+    object Register : Screen("register")
+    object RoleSelection : Screen("role_selection")
+    object ForgotPassword : Screen("forgot_password")
+    object Home : Screen("home")
+    object AddEditEvent : Screen("add_edit_event")
+    object Ticket : Screen("ticket")
     object AnnouncementFeed : Screen("announcement_feed")
     object AnnouncementDetail : Screen("announcement_detail")
     object AnnouncementForm : Screen("announcement_form")
@@ -30,23 +48,175 @@ class MainActivity : ComponentActivity() {
         setContent {
             val navController = rememberNavController()
 
-            // Inisialisasi ViewModel (Bertahan dari Screen Rotation)
+            val authViewModel: AuthViewModel = viewModel()
             val announcementViewModel: AnnouncementViewModel = viewModel()
+            val homeViewModel: HomeViewModel = viewModel()
+            val addEditViewModel: AddEditViewModel = viewModel()
+
+            // Debug installs should open Login so Register/Login can be tested repeatedly.
+            // Release installs restore Home only when a Supabase session already exists.
+            val isDebugBuild = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+            val startDest = if (isDebugBuild) {
+                Screen.Login.route
+            } else if (AuthRepository().isUserLoggedIn()) {
+                Screen.Home.route
+            } else {
+                Screen.Login.route
+            }
 
             NavHost(
                 navController = navController,
-                startDestination = Screen.AnnouncementFeed.route
+                startDestination = startDest
             ) {
-                // Modul 4: Fitur Pengumuman (Jefry Hindrayanto)
-                announcementNavGraph(navController, announcementViewModel)
+                // Auth Nav Graph
+                authNavGraph(navController, authViewModel, homeViewModel)
 
-                // Tempat menggabungkan modul anggota lain nanti:
-                // catalogNavGraph(navController, catalogViewModel)      // Fitur 1: Yehezkiel
-                // ticketNavGraph(navController, ticketViewModel)        // Fitur 2: Noel
-                // certificateNavGraph(navController, certificateViewModel) // Fitur 3: Steven
-                // scheduleNavGraph(navController, scheduleViewModel)    // Fitur 5: Sayyid
+                // Modul 1 & CRUD Event (Yehezkiel)
+                catalogNavGraph(navController, homeViewModel, addEditViewModel, authViewModel)
+
+                // Modul 2: Ticket (Noel)
+                composable(Screen.Ticket.route) {
+                    TicketFeatureRoute()
+                }
+
+                // Modul 4: Announcement (Jefry)
+                announcementNavGraph(navController, announcementViewModel)
             }
         }
+    }
+}
+
+// Extension Function untuk Navigasi Auth Flow
+fun NavGraphBuilder.authNavGraph(
+    navController: NavHostController,
+    authViewModel: AuthViewModel,
+    homeViewModel: HomeViewModel
+) {
+    composable(Screen.Login.route) {
+        LoginScreen(
+            viewModel = authViewModel,
+            onLoginSuccess = {
+                homeViewModel.loadUserRole()
+                navController.navigate(Screen.Home.route) {
+                    popUpTo(Screen.Login.route) { inclusive = true }
+                }
+            },
+            onNavigateToRegister = {
+                navController.navigate(Screen.Register.route)
+            },
+            onNavigateToForgot = {
+                navController.navigate(Screen.ForgotPassword.route)
+            }
+        )
+    }
+
+    composable(Screen.Register.route) {
+        RegisterScreen(
+            viewModel = authViewModel,
+            onNavigateToRoleSelection = {
+                navController.navigate(Screen.RoleSelection.route)
+            },
+            onNavigateToLogin = {
+                navController.popBackStack()
+            }
+        )
+    }
+
+    composable(Screen.RoleSelection.route) {
+        RoleSelectionScreen(
+            viewModel = authViewModel,
+            onRegistrationSuccess = {
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(Screen.Login.route) { inclusive = false }
+                    launchSingleTop = true
+                }
+            },
+            onBackClick = {
+                navController.popBackStack()
+            }
+        )
+    }
+
+    composable(Screen.ForgotPassword.route) {
+        ForgotPasswordScreen(
+            viewModel = authViewModel,
+            onNavigateBack = {
+                navController.popBackStack()
+            }
+        )
+    }
+}
+
+// Extension Function untuk Navigasi Modular Fitur Event / Catalog
+fun NavGraphBuilder.catalogNavGraph(
+    navController: NavHostController,
+    homeViewModel: HomeViewModel,
+    addEditViewModel: AddEditViewModel,
+    authViewModel: AuthViewModel
+) {
+    composable(Screen.Home.route) {
+        val authState by authViewModel.uiState.collectAsState()
+        HomeScreen(
+            viewModel = homeViewModel,
+            isLoggingOut = authState.isLoading,
+            authErrorMessage = authState.errorMessage,
+            onAddEventClick = {
+                addEditViewModel.resetForm()
+                navController.navigate(Screen.AddEditEvent.route)
+            },
+            onEditEventClick = { eventUiModel ->
+                val fullEvent = homeViewModel.findEvent(eventUiModel.id)
+                if (fullEvent != null) {
+                    addEditViewModel.loadEvent(fullEvent)
+                } else {
+                    addEditViewModel.resetForm()
+                }
+                navController.navigate(Screen.AddEditEvent.route)
+            },
+            onLogoutClick = {
+                authViewModel.signOut {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            },
+            onNavItemClick = { navItem ->
+                when (navItem) {
+                    EventlyNavItem.HOME, EventlyNavItem.EXPLORE -> {}
+                    EventlyNavItem.ANNOUNCEMENT -> {
+                        navController.navigate(Screen.AnnouncementFeed.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                    EventlyNavItem.TICKET -> {
+                        navController.navigate(Screen.Ticket.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                    EventlyNavItem.PROFILE -> {
+                        navController.navigate(Screen.AnnouncementFeed.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    composable(Screen.AddEditEvent.route) {
+        AddEditEventScreen(
+            viewModel = addEditViewModel,
+            onBackClick = {
+                homeViewModel.refreshEvents()
+                navController.popBackStack()
+            }
+        )
     }
 }
 
@@ -55,7 +225,6 @@ fun NavGraphBuilder.announcementNavGraph(
     navController: NavHostController,
     viewModel: AnnouncementViewModel
 ) {
-    // 1. Halaman Feed Pengumuman
     composable(Screen.AnnouncementFeed.route) {
         val announcements by viewModel.announcements.collectAsState()
 
@@ -66,13 +235,32 @@ fun NavGraphBuilder.announcementNavGraph(
                 navController.navigate(Screen.AnnouncementDetail.route)
             },
             onFabClick = {
-                viewModel.selectAnnouncement(null) // Reset ke Mode Buat Baru
+                viewModel.selectAnnouncement(null)
                 navController.navigate(Screen.AnnouncementForm.route)
+            },
+            onNavItemClick = { navItem ->
+                when (navItem) {
+                    EventlyNavItem.HOME, EventlyNavItem.EXPLORE -> {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                    EventlyNavItem.TICKET -> {
+                        navController.navigate(Screen.Ticket.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                    EventlyNavItem.ANNOUNCEMENT -> {}
+                    EventlyNavItem.PROFILE -> {}
+                }
             }
         )
     }
 
-    // 2. Halaman Detail Pengumuman
     composable(Screen.AnnouncementDetail.route) {
         val selectedAnnouncement by viewModel.selectedAnnouncement.collectAsState()
 
@@ -87,21 +275,19 @@ fun NavGraphBuilder.announcementNavGraph(
                 }
             )
         } ?: run {
-            // Fallback jika tidak ada data yang dipilih
             LaunchedEffect(Unit) {
                 navController.popBackStack()
             }
         }
     }
 
-    // 3. Halaman Form Pengumuman (Tambah / Edit)
     composable(Screen.AnnouncementForm.route) {
         val selectedAnnouncement by viewModel.selectedAnnouncement.collectAsState()
         val events by viewModel.events.collectAsState()
 
         AnnouncementFormScreen(
             initialAnnouncement = selectedAnnouncement,
-            eventOptions = events, // List EventDto dinamis dari Supabase
+            eventOptions = events,
             onBackClick = { navController.popBackStack() },
             onSubmit = { title, eventId, content ->
                 viewModel.saveAnnouncement(

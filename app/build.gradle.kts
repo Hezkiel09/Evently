@@ -37,6 +37,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -54,7 +56,7 @@ dependencies {
     // Supabase SDK (BOM 2.1.3)
     implementation(platform("io.github.jan-tennert.supabase:bom:2.1.3"))
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
-//    implementation("io.github.jan-tennert.supabase:serializer-kotlinx") // <-- WAJIB TAMBAHKAN INI
+    implementation("io.github.jan-tennert.supabase:gotrue-kt")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 
     // Navigation & ViewModel
