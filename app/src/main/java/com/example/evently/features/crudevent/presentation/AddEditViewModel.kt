@@ -60,14 +60,18 @@ class AddEditViewModel : ViewModel() {
                 val user = SupabaseNetwork.client.auth.currentUserOrNull()
                     ?: throw IllegalStateException("Silakan login terlebih dahulu.")
                 val profile = authRepository.getCurrentProfile()
-                if (profile?.role?.lowercase() !in setOf("organizer", "panitia")) {
-                    throw IllegalStateException("Hanya organizer yang dapat mengelola event.")
+                val role = profile?.role?.lowercase()
+                val isAdmin = role == "admin"
+                if (role !in setOf("organizer", "panitia", "admin")) {
+                    throw IllegalStateException("Role akun tidak dapat mengelola event.")
                 }
-                if (edit && event.organizerId != user.id) {
+                if (edit && event.organizerId != user.id && !isAdmin) {
                     throw IllegalStateException("Anda hanya dapat mengedit event milik sendiri.")
                 }
                 if (edit) {
-                    repository.updateEvent(event, user.id)
+                    val ownerId = event.organizerId
+                        ?: throw IllegalStateException("Owner event tidak ditemukan.")
+                    repository.updateEvent(event, ownerId)
                 } else {
                     repository.addEvent(event)
                 }

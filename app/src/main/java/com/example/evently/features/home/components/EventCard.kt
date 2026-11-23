@@ -116,7 +116,7 @@ fun EventCard(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    if (event.canManage && userRole == "organizer") {
+                    if (event.canManage && userRole in setOf("organizer", "admin")) {
                         Box {
                             var showMenu by remember { mutableStateOf(false) }
 

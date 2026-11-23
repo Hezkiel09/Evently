@@ -26,23 +26,25 @@ class EventRepository private constructor() {
         table.insert(payload(event, currentUserId))
     }
 
-    suspend fun updateEvent(event: Event, organizerId: String) {
+    suspend fun updateEvent(event: Event, ownerId: String) {
         val id = event.id ?: throw IllegalArgumentException("ID event tidak ditemukan.")
-        val payload = payload(event, organizerId)
+        val owner = event.organizerId ?: throw IllegalArgumentException("Owner event tidak ditemukan.")
+        require(owner == ownerId) { "Owner event tidak boleh diubah." }
+        val payload = payload(event, owner)
         // Do not allow a client update to transfer ownership.
         table.update(payload) {
             filter {
                 eq("id", id)
-                eq("organizer_id", organizerId)
+                eq("organizer_id", owner)
             }
         }
     }
 
-    suspend fun deleteEvent(eventId: Long, organizerId: String) {
+    suspend fun deleteEvent(eventId: Long, ownerId: String) {
         table.delete {
             filter {
                 eq("id", eventId)
-                eq("organizer_id", organizerId)
+                eq("organizer_id", ownerId)
             }
         }
     }

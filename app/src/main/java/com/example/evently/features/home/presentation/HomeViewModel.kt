@@ -23,6 +23,7 @@ data class EventUiModel(
     val location: String,
     val organizer: String,
     val bannerUrl: String?,
+    val organizerId: String?,
     val canManage: Boolean
 )
 
@@ -84,7 +85,9 @@ class HomeViewModel : ViewModel() {
                     parsed?.format(formatter) ?: event.eventDate,
                     parsed?.format(timeFormatter) ?: "",
                     event.location, "Evently", event.bannerUrl,
-                    _uiState.value.userRole == "organizer" && userId != null && event.organizerId == userId)
+                    event.organizerId,
+                    _uiState.value.userRole == "admin" ||
+                        (_uiState.value.userRole == "organizer" && userId != null && event.organizerId == userId))
             }
             _uiState.update { it.copy(events = mapped, isLoading = false) }
         } catch (e: Exception) {
@@ -97,17 +100,17 @@ class HomeViewModel : ViewModel() {
 
     fun deleteEvent(eventId: Long) = viewModelScope.launch {
         val userId = SupabaseNetwork.client.auth.currentUserOrNull()?.id
-        if (userId.isNullOrBlank() || _uiState.value.userRole != "organizer") {
-            _uiState.update { it.copy(errorMessage = "Hanya organizer yang dapat menghapus event.") }
+        if (userId.isNullOrBlank() || _uiState.value.userRole !in setOf("organizer", "admin")) {
+            _uiState.update { it.copy(errorMessage = "Akun ini tidak memiliki izin untuk menghapus event.") }
             return@launch
         }
         val event = _uiState.value.events.find { it.id == eventId }
-        if (event?.canManage != true) {
+        if (event?.canManage != true || event.organizerId.isNullOrBlank()) {
             _uiState.update { it.copy(errorMessage = "Anda hanya dapat menghapus event milik sendiri.") }
             return@launch
         }
         try {
-            repository.deleteEvent(eventId, userId)
+            repository.deleteEvent(eventId, event.organizerId)
             refreshEvents()
         } catch (e: Exception) {
             _uiState.update { it.copy(errorMessage = e.localizedMessage ?: "Gagal menghapus event.") }

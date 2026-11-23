@@ -51,7 +51,7 @@ fun UpComingEventSection(
                 modifier = Modifier.weight(1f)
             )
 
-            if (userRole == "organizer") {
+            if (userRole in setOf("organizer", "admin")) {
                 Button(
                     onClick = onAddEventClick,
                     colors = ButtonDefaults.buttonColors(
